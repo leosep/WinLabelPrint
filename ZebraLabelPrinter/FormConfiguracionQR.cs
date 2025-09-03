@@ -1,15 +1,23 @@
 ﻿// FormConfiguracionQR.cs
 using System;
+using System.ComponentModel;
 using System.Windows.Forms;
 
 namespace ZebraLabelPrinter
 {
     public partial class FormConfiguracionQR : Form
     {
-        // Propiedades públicas para acceder a las selecciones del usuario
+        
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
         public bool IncluirNumeroSerie { get; private set; }
+       
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
         public bool IncluirNombreBanco { get; private set; }
+      
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
         public bool IncluirModelo { get; private set; }
+     
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
         public bool IncluirUbicacion { get; private set; }
 
         public FormConfiguracionQR()

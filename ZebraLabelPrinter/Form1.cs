@@ -34,8 +34,11 @@ namespace ZebraLabelPrinter
             // Configura el DataGridView para seleccionar filas completas y múltiples filas
             dgvCajeros.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
             dgvCajeros.MultiSelect = true;
-            // Nuevo: Llenar el ComboBox con los puertos seriales disponibles
+            // Llenar el ComboBox con los puertos seriales disponibles
             LlenarPuertosSeriales();
+            // Llenar el ComboBox para el lenguaje de la impresora Zebra
+            // cboZebraLanguage.Items.AddRange(new string[] { "ZPL", "EPL" });
+            cboZebraLanguage.SelectedIndex = 0; // Selecciona ZPL por defecto
         }
 
         private void LlenarPuertosSeriales()
@@ -71,7 +74,7 @@ namespace ZebraLabelPrinter
             }
         }
 
-        private void CargarDatos(string searchTerm = null)
+        private void CargarDatos(string? searchTerm = null)
         {
             using (IDbConnection cnn = new SqliteConnection(connectionString))
             {
@@ -113,16 +116,19 @@ namespace ZebraLabelPrinter
             {
                 if (formAgregar.ShowDialog() == DialogResult.OK)
                 {
-                    using (IDbConnection cnn = new SqliteConnection(connectionString))
+                    var nuevoCajero = formAgregar.NuevoCajero;
+                    if (nuevoCajero != null)
                     {
-                        var nuevoCajero = formAgregar.NuevoCajero;
-                        string insertQuery = @"
-                            INSERT INTO Cajeros (NumeroDeSerie, NombreBanco, Modelo, Ubicacion, FechaDeInstalacion)
-                            VALUES (@NumeroDeSerie, @NombreBanco, @Modelo, @Ubicacion, @FechaDeInstalacion)";
-                        cnn.Execute(insertQuery, nuevoCajero);
+                        using (IDbConnection cnn = new SqliteConnection(connectionString))
+                        {
+                            string insertQuery = @"
+                                INSERT INTO Cajeros (NumeroDeSerie, NombreBanco, Modelo, Ubicacion, FechaDeInstalacion)
+                                VALUES (@NumeroDeSerie, @NombreBanco, @Modelo, @Ubicacion, @FechaDeInstalacion)";
+                            cnn.Execute(insertQuery, nuevoCajero);
+                        }
+                        CargarDatos();
+                        MessageBox.Show("Cajero agregado exitosamente.", "Éxito", MessageBoxButtons.OK, MessageBoxIcon.Information);
                     }
-                    CargarDatos();
-                    MessageBox.Show("Cajero agregado exitosamente.", "Éxito", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 }
             }
         }
@@ -132,31 +138,37 @@ namespace ZebraLabelPrinter
             if (dgvCajeros.SelectedRows.Count > 0)
             {
                 var cajeroSeleccionado = dgvCajeros.SelectedRows[0].DataBoundItem as Cajero;
-                using (var formEditar = new FormAgregarCajero())
+                if (cajeroSeleccionado != null)
                 {
-                    formEditar.txtNumeroSerie.Text = cajeroSeleccionado.NumeroDeSerie;
-                    formEditar.txtNombreBanco.Text = cajeroSeleccionado.NombreBanco;
-                    formEditar.txtModelo.Text = cajeroSeleccionado.Modelo;
-                    formEditar.txtUbicacion.Text = cajeroSeleccionado.Ubicacion;
-                    formEditar.dtpFechaInstalacion.Value = cajeroSeleccionado.FechaDeInstalacion;
-                    if (formEditar.ShowDialog() == DialogResult.OK)
+                    using (var formEditar = new FormAgregarCajero())
                     {
-                        using (IDbConnection cnn = new SqliteConnection(connectionString))
+                        formEditar.txtNumeroSerie.Text = cajeroSeleccionado.NumeroDeSerie;
+                        formEditar.txtNombreBanco.Text = cajeroSeleccionado.NombreBanco;
+                        formEditar.txtModelo.Text = cajeroSeleccionado.Modelo;
+                        formEditar.txtUbicacion.Text = cajeroSeleccionado.Ubicacion;
+                        formEditar.dtpFechaInstalacion.Value = cajeroSeleccionado.FechaDeInstalacion;
+                        if (formEditar.ShowDialog() == DialogResult.OK)
                         {
                             var cajeroEditado = formEditar.NuevoCajero;
-                            cajeroEditado.Id = cajeroSeleccionado.Id; // Mantener el mismo Id
-                            string updateQuery = @"
-                                UPDATE Cajeros
-                                SET NumeroDeSerie = @NumeroDeSerie,
-                                    NombreBanco = @NombreBanco,
-                                    Modelo = @Modelo,
-                                    Ubicacion = @Ubicacion,
-                                    FechaDeInstalacion = @FechaDeInstalacion
-                                WHERE Id = @Id";
-                            cnn.Execute(updateQuery, cajeroEditado);
+                            if (cajeroEditado != null)
+                            {
+                                using (IDbConnection cnn = new SqliteConnection(connectionString))
+                                {
+                                    cajeroEditado.Id = cajeroSeleccionado.Id; // Mantener el mismo Id
+                                    string updateQuery = @"
+                                        UPDATE Cajeros
+                                        SET NumeroDeSerie = @NumeroDeSerie,
+                                            NombreBanco = @NombreBanco,
+                                            Modelo = @Modelo,
+                                            Ubicacion = @Ubicacion,
+                                            FechaDeInstalacion = @FechaDeInstalacion
+                                        WHERE Id = @Id";
+                                    cnn.Execute(updateQuery, cajeroEditado);
+                                }
+                                CargarDatos();
+                                MessageBox.Show("Cajero editado exitosamente.", "Éxito", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                            }
                         }
-                        CargarDatos();
-                        MessageBox.Show("Cajero editado exitosamente.", "Éxito", MessageBoxButtons.OK, MessageBoxIcon.Information);
                     }
                 }
             }
@@ -173,13 +185,16 @@ namespace ZebraLabelPrinter
                 if (MessageBox.Show("¿Estás seguro de que quieres eliminar el cajero seleccionado?", "Confirmar Eliminación", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
                 {
                     var cajeroSeleccionado = dgvCajeros.SelectedRows[0].DataBoundItem as Cajero;
-                    using (IDbConnection cnn = new SqliteConnection(connectionString))
+                    if (cajeroSeleccionado != null)
                     {
-                        string deleteQuery = "DELETE FROM Cajeros WHERE Id = @Id";
-                        cnn.Execute(deleteQuery, new { Id = cajeroSeleccionado.Id });
+                        using (IDbConnection cnn = new SqliteConnection(connectionString))
+                        {
+                            string deleteQuery = "DELETE FROM Cajeros WHERE Id = @Id";
+                            cnn.Execute(deleteQuery, new { Id = cajeroSeleccionado.Id });
+                        }
+                        CargarDatos();
+                        MessageBox.Show("Cajero eliminado exitosamente.", "Éxito", MessageBoxButtons.OK, MessageBoxIcon.Information);
                     }
-                    CargarDatos();
-                    MessageBox.Show("Cajero eliminado exitosamente.", "Éxito", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 }
             }
             else
@@ -195,80 +210,17 @@ namespace ZebraLabelPrinter
                 MessageBox.Show("Por favor, selecciona al menos un cajero para imprimir.", "Advertencia", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
-            // Muestra el formulario de configuración del QR
-            using (var formConfig = new FormConfiguracionQR())
+
+            string? selectedLanguage = cboZebraLanguage.SelectedItem?.ToString();
+
+            if (string.IsNullOrEmpty(selectedLanguage))
             {
-                if (formConfig.ShowDialog() != DialogResult.OK)
-                {
-                    // Si el usuario cancela, no se hace nada
-                    return;
-                }
-                // Obtiene las opciones de configuración del QR desde el formulario
-                bool incluirSerial = formConfig.IncluirNumeroSerie;
-                bool incluirBanco = formConfig.IncluirNombreBanco;
-                bool incluirModelo = formConfig.IncluirModelo;
-                bool incluirUbicacion = formConfig.IncluirUbicacion;
-                string usbAddress = EncontrarImpresoraZebra();
-
-                if (string.IsNullOrEmpty(usbAddress))
-                {
-                    MessageBox.Show("No se encontró ninguna impresora Zebra conectada por USB.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                    return;
-                }
-                Connection connection = new UsbConnection(usbAddress);
-                try
-                {
-                    connection.Open();
-                    ZebraPrinter printer = ZebraPrinterFactory.GetInstance(connection);
-
-                    foreach (DataGridViewRow row in dgvCajeros.SelectedRows)
-                    {
-                        if (row.DataBoundItem is Cajero cajero)
-                        {
-                            // 1. Limpiar el área del código QR antes de imprimir
-                            LimpiarAreaQR(connection);
-                            // 2. Generar el contenido del QR basándonos en las opciones del usuario
-                            string qrData = GenerarDatosQR(cajero, incluirSerial, incluirBanco, incluirModelo, incluirUbicacion);
-                            // 3. Generar el código QR como una imagen
-                            QRCodeGenerator qrGenerator = new QRCodeGenerator();
-                            QRCodeData qrCodeData = qrGenerator.CreateQrCode(qrData, QRCodeGenerator.ECCLevel.Q);
-                            QRCode qrCode = new QRCode(qrCodeData);
-                            Bitmap qrImage = qrCode.GetGraphic(20);
-                            // 4. Convertir la imagen del QR a formato de byte para ZPL
-                            string hexString = BitmapToZpl(qrImage);
-                            // 5. Construir el comando ZPL para la etiqueta
-                            StringBuilder zpl = new StringBuilder();
-                            zpl.AppendLine("^XA");
-                            zpl.AppendLine($"^FO50,50^GFA,{hexString}^FS"); // Comando para dibujar la imagen del QR
-                            zpl.AppendLine("^FX Posición del texto.");
-                            zpl.AppendLine("^FO50,250^A0N,30,30^FD" + cajero.NumeroDeSerie + "^FS");
-                            zpl.AppendLine("^FO50,300^A0N,20,20^FD" + cajero.NombreBanco + "^FS");
-                            zpl.AppendLine("^XZ");
-                            // Se cambia a Write para mayor compatibilidad
-                            connection.Write(Encoding.ASCII.GetBytes(zpl.ToString()));
-                        }
-                    }
-                    MessageBox.Show("Etiquetas impresas exitosamente en la impresora Zebra.", "Éxito", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                }
-                catch (ConnectionException ex)
-                {
-                    MessageBox.Show("Error de conexión con la impresora Zebra: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                }
-                finally
-                {
-                    if (connection != null)
-                    {
-                        try
-                        {
-                            connection.Close();
-                        }
-                        catch (ConnectionException ex)
-                        {
-                            MessageBox.Show("Error al cerrar la conexión: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                        }
-                    }
-                }
+                MessageBox.Show("Por favor, selecciona un lenguaje de impresora Zebra.", "Advertencia", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
             }
+
+            // Llama al método de impresión con el lenguaje seleccionado
+            ImprimirZebra(selectedLanguage);
         }
 
         private void btnImprimirAvery_Click(object sender, EventArgs e)
@@ -311,20 +263,10 @@ namespace ZebraLabelPrinter
                             if (row.DataBoundItem is Cajero cajero)
                             {
                                 string qrData = GenerarDatosQR(cajero, incluirSerial, incluirBanco, incluirModelo, incluirUbicacion);
-                                StringBuilder epl = new StringBuilder();
-
-                                epl.AppendLine("N");
-                                epl.AppendLine("q812");
-                                epl.AppendLine("Q609,24");
-                                epl.AppendLine("B450,100,0,M,2,4,4,Q,S\"" + qrData + "\"");
-                                epl.AppendLine("A450,250,0,4,1,1,N,\"" + cajero.NumeroDeSerie + "\"");
-                                epl.AppendLine("A450,280,0,3,1,1,N,\"" + cajero.NombreBanco + "\"");
-                                epl.AppendLine("P1");
-
-                                serialPort.Write(epl.ToString());
-                                serialPort.WriteLine("\n");
-
-                                System.Threading.Thread.Sleep(500);
+                                // Genera el código EPL para el QR y el texto
+                                string epl = GenerarEPL(cajero, qrData);
+                                serialPort.Write(epl);
+                                System.Threading.Thread.Sleep(500); // Pausa para que la impresora procese
                             }
                         }
                         MessageBox.Show("Etiquetas impresas exitosamente en la impresora Avery Dennison.", "Éxito", MessageBoxButtons.OK, MessageBoxIcon.Information);
@@ -337,7 +279,118 @@ namespace ZebraLabelPrinter
             }
         }
 
-        private string EncontrarImpresoraZebra()
+        private void ImprimirZebra(string language)
+        {
+            string? usbAddress = EncontrarImpresoraZebra();
+
+            if (string.IsNullOrEmpty(usbAddress))
+            {
+                MessageBox.Show("No se encontró ninguna impresora Zebra conectada por USB.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+            Connection? connection = null;
+            try
+            {
+                connection = new UsbConnection(usbAddress);
+                connection.Open();
+
+                using (var formConfig = new FormConfiguracionQR())
+                {
+                    if (formConfig.ShowDialog() != DialogResult.OK)
+                    {
+                        return;
+                    }
+
+                    bool incluirSerial = formConfig.IncluirNumeroSerie;
+                    bool incluirBanco = formConfig.IncluirNombreBanco;
+                    bool incluirModelo = formConfig.IncluirModelo;
+                    bool incluirUbicacion = formConfig.IncluirUbicacion;
+
+                    foreach (DataGridViewRow row in dgvCajeros.SelectedRows)
+                    {
+                        if (row.DataBoundItem is Cajero cajero)
+                        {
+                            string qrData = GenerarDatosQR(cajero, incluirSerial, incluirBanco, incluirModelo, incluirUbicacion);
+                            string labelCommand = "";
+                            if (language == "ZPL")
+                            {
+                                labelCommand = GenerarZPL(cajero, qrData);
+                            }
+                            else if (language == "EPL")
+                            {
+                                labelCommand = GenerarEPL(cajero, qrData);
+                            }
+
+                            if (!string.IsNullOrEmpty(labelCommand))
+                            {
+                                connection.Write(Encoding.ASCII.GetBytes(labelCommand));
+                            }
+                        }
+                    }
+                    MessageBox.Show($"Etiquetas impresas exitosamente en la impresora Zebra ({language}).", "Éxito", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
+            }
+            catch (ConnectionException ex)
+            {
+                MessageBox.Show("Error de conexión con la impresora Zebra: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            finally
+            {
+                if (connection != null)
+                {
+                    try
+                    {
+                        connection.Close();
+                    }
+                    catch (ConnectionException ex)
+                    {
+                        MessageBox.Show("Error al cerrar la conexión: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    }
+                }
+            }
+        }
+
+        private string GenerarZPL(Cajero cajero, string qrData)
+        {
+            StringBuilder zpl = new StringBuilder();
+            zpl.AppendLine("^XA");
+            // Comando QR, se ajusta la posición y el tamaño
+            zpl.AppendLine($"^FO50,50^BQN,2,8^FDQA,{qrData}^FS");
+            // Texto para el número de serie
+            zpl.AppendLine($"^FO50,250^A0N,30,30^FDNúmero de Serie: {cajero.NumeroDeSerie}^FS");
+            // Texto para el nombre del banco
+            zpl.AppendLine($"^FO50,290^A0N,20,20^FDNombre del Banco: {cajero.NombreBanco}^FS");
+            // Texto para el modelo
+            zpl.AppendLine($"^FO50,320^A0N,20,20^FDModelo: {cajero.Modelo}^FS");
+            // Texto para la ubicación
+            zpl.AppendLine($"^FO50,350^A0N,20,20^FDUbicación: {cajero.Ubicacion}^FS");
+            zpl.AppendLine("^XZ");
+            return zpl.ToString();
+        }
+
+        private string GenerarEPL(Cajero cajero, string qrData)
+        {
+            StringBuilder epl = new StringBuilder();
+            epl.AppendLine("N");
+            // Limpia el búfer de la imagen
+            epl.AppendLine("I8,A,001");
+            epl.AppendLine("q609");
+            epl.AppendLine("Q406,24");
+            // Comando QR para EPL2
+            epl.AppendLine($"B50,50,0,Q4,S2,\"{qrData}\"");
+            // Texto para el número de serie
+            epl.AppendLine($"A50,250,0,4,1,1,N,\"Número de Serie: {cajero.NumeroDeSerie}\"");
+            // Texto para el nombre del banco
+            epl.AppendLine($"A50,280,0,3,1,1,N,\"Nombre del Banco: {cajero.NombreBanco}\"");
+            // Texto para el modelo
+            epl.AppendLine($"A50,310,0,3,1,1,N,\"Modelo: {cajero.Modelo}\"");
+            // Texto para la ubicación
+            epl.AppendLine($"A50,340,0,3,1,1,N,\"Ubicación: {cajero.Ubicacion}\"");
+            epl.AppendLine("P1");
+            return epl.ToString();
+        }
+
+        private string? EncontrarImpresoraZebra()
         {
             try
             {
@@ -356,7 +409,6 @@ namespace ZebraLabelPrinter
 
         private string GenerarDatosQR(Cajero cajero, bool incluirSerial, bool incluirBanco, bool incluirModelo, bool incluirUbicacion)
         {
-            // Código para generar los datos del QR
             var sb = new StringBuilder();
             if (incluirSerial)
             {
@@ -376,42 +428,15 @@ namespace ZebraLabelPrinter
             }
             return sb.ToString();
         }
+    }
 
-        private void LimpiarAreaQR(Connection connection)
-        {
-            // Comando ZPL para borrar la memoria de imagen de la impresora
-            string zplClear = "^XA^IDR:*.GRF^FS^XZ";
-            try
-            {
-                connection.Write(Encoding.ASCII.GetBytes(zplClear));
-            }
-            catch (ConnectionException e)
-            {
-                // Manejar el error
-            }
-        }
-
-        private string BitmapToZpl(Bitmap qrImage)
-        {
-            try
-            {
-                using (MemoryStream stream = new MemoryStream())
-                {
-                    qrImage.Save(stream, System.Drawing.Imaging.ImageFormat.Bmp);
-                    byte[] bmpBytes = stream.ToArray();
-                    StringBuilder hexString = new StringBuilder();
-                    foreach (byte b in bmpBytes)
-                    {
-                        hexString.AppendFormat("{0:X2}", b);
-                    }
-                    return hexString.ToString();
-                }
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show("Error al convertir la imagen a ZPL: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                return string.Empty;
-            }
-        }
+    public class Cajero
+    {
+        public int Id { get; set; }
+        public string NumeroDeSerie { get; set; } = string.Empty;
+        public string NombreBanco { get; set; } = string.Empty;
+        public string Modelo { get; set; } = string.Empty;
+        public string Ubicacion { get; set; } = string.Empty;
+        public DateTime FechaDeInstalacion { get; set; }
     }
 }

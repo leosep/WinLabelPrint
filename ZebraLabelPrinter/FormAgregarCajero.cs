@@ -1,12 +1,13 @@
-﻿// FormAgregarCajero.cs
-using System;
+﻿using System;
 using System.Windows.Forms;
+using System.ComponentModel;
 
 namespace ZebraLabelPrinter
 {
     public partial class FormAgregarCajero : Form
     {
-        public Cajero NuevoCajero { get; private set; }
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+        public Cajero? NuevoCajero { get; private set; }
 
         public FormAgregarCajero()
         {
